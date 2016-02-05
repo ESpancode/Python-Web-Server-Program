@@ -1,62 +1,97 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+class Webserver(object):
+	def __init__(self):
+		self._server = WebServer()
 
-# C extensions
-*.so
+	def Main(self):
+		self._server.serve()
 
-# Distribution / packaging
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
+	class WebServer(object):
+		def __init__(self): # Set WWW Root Path
+			self._rootPath = "C:\WebRoot\" # Set default page
+			self._defaultPage = "index.html"
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+		def serve(self):
+			hostName = Dns.GetHostName()
+			serverIP = Dns.GetHostEntry(hostName).AddressList(4)
+			Port = "8080"
+			self._tcpListener = TcpListener(serverIP, Int32.Parse(Port))
+			self._tcpListener.Start()
+			Console.WriteLine("Web server started at: " + hostName + " " + serverIP.ToString() + ":" + Port)
+			while (True):
+				self._clientSocket = self._tcpListener.AcceptSocket() # Socket Information
+				clientInfo = self._clientSocket.RemoteEndPoint
+				Console.WriteLine("Client: " + clientInfo.Address.ToString() + ":" + clientInfo.Port.ToString())
+				self.ProcessRequest()
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*,cover
-.hypothesis/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-#Ipython Notebook
-.ipynb_checkpoints
+		def ProcessRequest(self):
+			recvBytes = Array.CreateInstance(Byte, 1024)
+			htmlReq = None # Receive HTTP Request from Web Browser #Some browsers send empty requests sometimes, in addition to the real requests.
+			tries = 10
+			while tries > 0:
+				bytes = self._clientSocket.Receive(recvBytes, 0, self._clientSocket.Available, SocketFlags.None)
+				if bytes > 0:
+					tries = 0
+				else:
+					tries = tries - 1
+					Console.WriteLine("Failed again, retry") #Pause for a moment (50 milliseconds) to wait for the next request
+					Thread.Sleep(50)
+			htmlReq = Encoding.ASCII.GetString(recvBytes, 0, bytes)
+			Console.WriteLine("HTTP Request: ")
+			Console.WriteLine(htmlReq)
+			strArray = htmlReq.Trim.Split(" ") # Determine the HTTP method (GET only)
+			if self.strArray(0).Trim().ToUpper.Equals("GET"):
+				strRequest = self.strArray(1).Trim
+				if (strRequest.StartsWith("/")):
+					strRequest = strRequest.Substring(1)
+				if (strRequest.EndsWith("/") | strRequest.Equals("")):
+					strRequest = strRequest + self._defaultPage
+				strRequest = self._rootPath + strRequest
+				self.sendHTMLResponse(strRequest)
+			elif self.strArray(0).Trim() != "": # Not HTTP GET method
+				strRequest = self._rootPath + "Error\400.html"
+				self.sendHTMLResponse(strRequest)
+			self._clientSocket.Close()
+ # Send HTTP Response
+		def sendHTMLResponse(self, httpRequest): # Get the file content of HTTP Request
+			if not File.Exists(httpRequest):
+				httpRequest = self._rootPath + "Error\400.html" #should really be 404.html
+				response = "404 Not Found"
+			else:
+				response = "200 OK"
+			streamReader = FileStream(httpRequest, IO.FileMode.Open, IO.FileAccess.Read)
+			len = StreamReader.Length
+			strBuff = Array.CreateInstance(Byte, len)
+			StreamReader.Read(strBuff, 0, len)
+			StreamReader.Close()
+			StreamReader = None # Set HTML Header
+			htmlHeader = "HTTP/1.0 " + response + ControlChars.CrLf + "Server: WebServer 1.0" + ControlChars.CrLf + "Content-Length: " + len + ControlChars.CrLf + "Content-Type: " + self.getContentType(httpRequest) + ControlChars.CrLf + ControlChars.CrLf # The content Length of HTML Header
+			headerByte = Encoding.ASCII.GetBytes(htmlHeader)
+			Console.WriteLine("HTML Header: " + ControlChars.CrLf + htmlHeader) # Send HTML Header back to Web Browser
+			self._clientSocket.Send(headerByte, 0, headerByte.Length, SocketFlags.None) # Send HTML Content back to Web Browser
+			self._clientSocket.Send(strBuff, 0, len, SocketFlags.None)
+ # Get Content Type
+		def getContentType(self, httpRequest):
+			if (httpRequest.EndsWith("html")):
+				return "text/html"
+			elif (httpRequest.EndsWith("htm")):
+				return "text/html"
+			elif (httpRequest.EndsWith("txt")):
+				return "text/plain"
+			elif (httpRequest.EndsWith("gif")):
+				return "image/gif"
+			elif (httpRequest.EndsWith("jpg")):
+				return "image/jpeg"
+			elif (httpRequest.EndsWith("jpeg")):
+				return "image/jpeg"
+			elif (httpRequest.EndsWith("pdf")):
+				return "application/pdf"
+			elif (httpRequest.EndsWith("pdf")):
+				return "application/pdf"
+			elif (httpRequest.EndsWith("doc")):
+				return "application/msword"
+			elif (httpRequest.EndsWith("xls")):
+				return "application/vnd.ms-excel"
+			elif (httpRequest.EndsWith("ppt")):
+				return "application/vnd.ms-powerpoint"
+			else:
+				return "text/plain"
